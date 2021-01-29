@@ -34,7 +34,7 @@ def DirWalkThrough(base_dir_path):
 				if iter[0].endswith('/'):
 					filePath = iter[0] + jter
 				else:
-					file_path = iter[0] + '/' + jter
+					filePath = iter[0] + '/' + jter
 				file_path_list.append(filePath)
 	return file_path_list
 
