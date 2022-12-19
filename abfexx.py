@@ -7,24 +7,6 @@ import csv
 import os
 import multiprocessing
 
-start = time.time()
-
-# channel settings [0: x, 2: z, 4: ioncurrent]
-abf_channel_list = [0, 2, 4]
-
-# multithreading counts
-thread_num = 8
-
-args_num = len(sys.argv)
-
-if args_num <= 1:
-	print('usage: ')
-	print('python abfexx.py [file1.abf] [file2.abf] ...')
-	print('python abfexx.py -r [directory1] [directory2] ...')
-	exit()
-
-args_list = sys.argv
-
 def DirWalkThrough(base_dir_path):
 	file_path_list = []
 	for iter in os.walk(base_dir_path):
@@ -37,27 +19,6 @@ def DirWalkThrough(base_dir_path):
 					filePath = iter[0] + '/' + jter
 				file_path_list.append(filePath)
 	return file_path_list
-
-# locate each abf file
-file_path_list = []
-if args_list[1] == '-r':
-	for iter in range(2, args_num):
-		file_path_list += DirWalkThrough(sys.argv[iter])
-else:
-	for iter in range(1, args_num):
-		file_path_list.append(sys.argv[iter])
-
-# allocate multithread tasks to cores
-file_num = len(file_path_list)
-file_multiples = file_num // thread_num
-file_remainder = file_num % thread_num
-actual_core_counts = thread_num if file_multiples > 0 else file_remainder
-core_segments = np.array(np.ones((thread_num))).astype(int)
-core_segments = (core_segments * file_multiples + np.concatenate((np.ones((file_remainder)), np.zeros((thread_num-file_remainder))))).astype(int)
-for iter in range(1, actual_core_counts):
-	core_segments[iter] += core_segments[iter-1]
-
-process_indicator = multiprocessing.Value('i', 0)
 
 # thread process function
 def ThreadProc(start_index, end_index):
@@ -88,25 +49,39 @@ def paralleling_operation():
 	for iter in range(actual_core_counts):
 		hThreads[iter].join()
 
-paralleling_operation()
+if __name__ == '__main__':
+	start = time.time()
+	# channel settings [0: x, 2: z, 4: ioncurrent]
+	abf_channel_list = [5, 6]
+	# multithreading counts
+	thread_num = 8
+	args_num = len(sys.argv)
+	if args_num <= 1:
+		print('usage: ')
+		print('python abfexx.py [file1.abf] [file2.abf] ...')
+		print('python abfexx.py -r [directory1] [directory2] ...')
+		exit()
+	args_list = sys.argv
+	# locate each abf file
+	file_path_list = []
+	if args_list[1] == '-r':
+		for iter in range(2, args_num):
+			file_path_list += DirWalkThrough(sys.argv[iter])
+	else:
+		for iter in range(1, args_num):
+			file_path_list.append(sys.argv[iter])
 
-end = time.time()
-print('ABFExtraction multi-thread, %d file(s) converted, %f s elapsed.' % (file_num, end-start))
+	# allocate multithread tasks to cores
+	file_num = len(file_path_list)
+	file_multiples = file_num // thread_num
+	file_remainder = file_num % thread_num
+	actual_core_counts = thread_num if file_multiples > 0 else file_remainder
+	core_segments = np.array(np.ones((thread_num))).astype(int)
+	core_segments = (core_segments * file_multiples + np.concatenate((np.ones((file_remainder)), np.zeros((thread_num-file_remainder))))).astype(int)
+	for iter in range(1, actual_core_counts):
+		core_segments[iter] += core_segments[iter-1]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	process_indicator = multiprocessing.Value('i', 0)
+	paralleling_operation()
+	end = time.time()
+	print('ABFExtraction multi-thread, %d file(s) converted, %f s elapsed.' % (file_num, end-start))
