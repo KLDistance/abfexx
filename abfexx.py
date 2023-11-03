@@ -7,6 +7,8 @@ import csv
 import os
 import multiprocessing
 
+process_indicator = multiprocessing.Value('i', 0)
+
 def DirWalkThrough(base_dir_path):
 	file_path_list = []
 	for iter in os.walk(base_dir_path):
@@ -21,7 +23,7 @@ def DirWalkThrough(base_dir_path):
 	return file_path_list
 
 # thread process function
-def ThreadProc(start_index, end_index):
+def ThreadProc(abf_channel_list, file_path_list, start_index, end_index):
 	global process_indicator
 	for iter in range(start_index, end_index):
 		abf = pyabf.ABF(file_path_list[iter])
@@ -37,17 +39,18 @@ def ThreadProc(start_index, end_index):
 			csvwriter.writerows(coarray)
 			hcsvfp.close()
 			process_indicator.value += 1
-			print('%s conversion done. (%d/%d)' % (csvfilename, process_indicator.value, file_num))
+			print('%s conversion done. (%d/%d)' % (csvfilename, process_indicator.value, len(file_path_list)))
 			sys.stdout.flush()
 		
-def paralleling_operation():
-	hThreads = []
-	for iter in range(actual_core_counts):
-		hThreads.append(multiprocessing.Process(target = ThreadProc, args=(core_segments[iter-1] if iter > 0 else int(0), core_segments[iter])))
-		hThreads[iter].start()
-	# wait for multiple termination events
-	for iter in range(actual_core_counts):
-		hThreads[iter].join()
+def paralleling_operation(abf_channel_list, file_path_list):
+    hThreads = []
+    for iter in range(actual_core_counts):
+    	hThreads.append(multiprocessing.Process(target = ThreadProc, args=(abf_channel_list, file_path_list, core_segments[iter-1] if iter > 0 else int(0), core_segments[iter])))
+    	hThreads[iter].start()
+    # wait for multiple termination events    
+    for iter in range(actual_core_counts):
+        hThreads[iter].join()
+        print(str(iter) + ' joined')
 
 if __name__ == '__main__':
 	start = time.time()
@@ -80,8 +83,6 @@ if __name__ == '__main__':
 	core_segments = (core_segments * file_multiples + np.concatenate((np.ones((file_remainder)), np.zeros((thread_num-file_remainder))))).astype(int)
 	for iter in range(1, actual_core_counts):
 		core_segments[iter] += core_segments[iter-1]
-
-	process_indicator = multiprocessing.Value('i', 0)
-	paralleling_operation()
+	paralleling_operation(abf_channel_list, file_path_list)
 	end = time.time()
 	print('ABFExtraction multi-thread, %d file(s) converted, %f s elapsed.' % (file_num, end-start))
